@@ -1,0 +1,22 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                UID: ${UID:-1000}
+                GID: ${GID:-1000}
+        container_name: test
+        environment:
+            - VIRTUAL_HOST=test.local
+            - VIRTUAL_PROTO=http
+            - VIRTUAL_PORT=80
+            - CERT_NAME=test.local
+        user: root
+        volumes:
+            - .:/var/www/html
+        networks:
+            - devnet
+networks:
+    devnet:
+        external: true

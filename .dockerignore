@@ -1,0 +1,9 @@
+.git
+node_modules
+vendor
+var
+tmp
+tests
+.DS_Store
+.env.local
+.env.test

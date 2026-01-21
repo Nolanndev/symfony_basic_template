@@ -13,11 +13,12 @@ use Symfony\Component\Process\Process;
 
 #[AsCommand(
     name: 'app:test',
-    description: 'test command',
+    description: 'Pipeline de génération GTFS + Map',
 )]
 class TestCommand extends Command
 {
     private LoggerInterface $logger;
+
     public function __construct(
         #[Target('app_customLogger')]
         LoggerInterface $logger
@@ -27,91 +28,105 @@ class TestCommand extends Command
         parent::__construct();
     }
 
-    protected function configure(): void
-    {}
-
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
         $this->logger->info('Test command - Début');
         $processStartTime = hrtime(true);
 
+        $hostProjectDir = $_ENV['HOST_PROJECT_DIR'] ?? getcwd();
 
         $id = str_replace('.', '_', uniqid('client_', true));
-        $gtfsId = sprintf('%s.zip', $id);
+        $gtfsFilename = sprintf('%s.zip', $id);
+        $svgFilename = sprintf('%s.svg', $id);
 
         //
         //   COPIE
         //
-        $io->writeln('Copie du gtfs');
+        $io->writeln('Copie du gtfs...');
         $copyStartTime = hrtime(true);
-        $process = new Process(['cp', './data/gtfs/gtfs-aix.zip', sprintf('./data/gtfs/%s', $gtfsId)]);
+
+        $process = new Process(['cp', './data/gtfs/gtfs-aix.zip', sprintf('./data/gtfs/%s', $gtfsFilename)]);
         $process->run();
+
         if (!$process->isSuccessful()) {
             $io->error('Impossible de copier le gtfs');
-            $this->logger->error('Impossible de copier le gtfs - ' . $process->getErrorOutput());
             return Command::FAILURE;
         }
-        $copyEndTime = hrtime(true);
-        $copyTime = ($copyEndTime - $copyStartTime) / 1e+9;
-        $io->writeln(sprintf('Copie du gtfs terminée en %.03f secondes', $copyTime));
+
+        $copyTime = (hrtime(true) - $copyStartTime) / 1e+9;
+        $io->writeln(sprintf(' <info>OK</info> Copie terminée en %.03f s', $copyTime));
+
 
         //
         //   PFAEDLE
         //
-        $io->writeln(sprintf('Lancement du Pfaedle sur le gtfs %s', $gtfsId));
+        $io->writeln(sprintf('Lancement de Pfaedle sur %s', $gtfsFilename));
         $pfaedleStartTime = hrtime(true);
-        $hostProjectDir = $_ENV['HOST_PROJECT_DIR'] ?? getcwd();
+
         $process = new Process([
-            'docker','run','-i','--rm',
-            '--platform','linux/amd64',
+            'docker', 'run', '-i', '--rm',
+            '--platform', 'linux/amd64',
             '--volume', sprintf('%s/data/osm:/osm', $hostProjectDir),
             '--volume', sprintf('%s/data/gtfs:/gtfs', $hostProjectDir),
             '--volume', sprintf('%s/data/gtfs-out:/gtfs-out', $hostProjectDir),
             'ghcr.io/ad-freiburg/pfaedle:latest',
             '-x', '/osm/sud-france.osm',
-            '-i', sprintf('/gtfs/%s', $gtfsId),
-//            '--inplace',
+            '-i', sprintf('/gtfs/%s', $gtfsFilename),
+            '--inplace'
         ]);
+
+        $process->setTimeout(3600);
         $process->run();
+
         if (!$process->isSuccessful()) {
             $io->error('Echec du pfaedle');
-            $this->logger->error('Echec du pfaedle - ' . $process->getErrorOutput());
+            $this->logger->error($process->getErrorOutput());
             return Command::FAILURE;
         }
-        $pfaedleEndTime = hrtime(true);
-        $pfaedleTime = ($pfaedleEndTime - $pfaedleStartTime) / 1e+9;
-        $io->writeln(sprintf('Pfaedle terminé en %.03f secondes', $pfaedleTime));
 
+        $pfaedleTime = (hrtime(true) - $pfaedleStartTime) / 1e+9;
+        $io->writeln(sprintf(' <info>OK</info> Pfaedle terminé en %.03f s', $pfaedleTime));
 
 
         //
         //   LOOM
         //
-        $io->writeln(sprintf('Lancement du loom sur le gtfs %s', $gtfsId));
+        $io->writeln('Lancement de Loom...');
         $loomStartTime = hrtime(true);
+
+        $bashCommand = sprintf(
+            'gtfs2graph -m tram /data/gtfs/%s | topo | loom | octi | transitmap > /data/gtfs-out/%s',
+            $gtfsFilename,
+            $svgFilename
+        );
+
         $process = new Process([
             'docker', 'run', '-i', '--rm',
+            // On mappe tout le dossier data pour simplifier l'accès (in/out)
             '--volume', sprintf('%s/data:/data', $hostProjectDir),
             'loom',
-            '/bin/bash', '-c', 'gtfs2graph -m tram /data/gtfs/gtfs-aix.zip | topo | loom | octi | transitmap'
+            '/bin/bash', '-c', $bashCommand
         ]);
+
+        $process->setTimeout(3600);
         $process->run();
+
         if (!$process->isSuccessful()) {
-            $io->error('Echec du pfaedle');
-            $this->logger->error('Echec du pfaedle - ' . $process->getErrorOutput());
+            $io->error('Echec du Loom');
+            $this->logger->error($process->getErrorOutput());
             return Command::FAILURE;
         }
-        $loomEndTime = hrtime(true);
-        $loomTime = ($loomEndTime - $loomStartTime) / 1e+9;
-        $io->writeln(sprintf('Loom terminé en %.03f secondes', $loomTime));
+
+        $loomTime = (hrtime(true) - $loomStartTime) / 1e+9;
+        $io->writeln(sprintf(' <info>OK</info> Loom terminé en %.03f s', $loomTime));
 
 
-
-        $processEndTime = hrtime(true);
-        $processTime = ($processEndTime - $processStartTime) / 1e+9;
-        $io->writeln(sprintf('Processus terminé en %.03f secondes', $processTime));
-        $io->success('Génération terminée.');
+        //
+        // FIN
+        //
+        $processTime = (hrtime(true) - $processStartTime) / 1e+9;
+        $io->success(sprintf('Génération complète terminée en %.03f s. Fichier : data/gtfs-out/%s', $processTime, $svgFilename));
 
         $this->logger->info('Test command - Fin');
 

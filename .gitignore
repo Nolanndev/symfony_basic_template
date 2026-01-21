@@ -38,3 +38,5 @@ phpstan.neon
 /public/data/
 data/**/*.zip
 data/**/*.osm
+data/**/*.svg
+data/**/*.txt

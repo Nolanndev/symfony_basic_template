@@ -12,9 +12,11 @@ services:
             - VIRTUAL_PROTO=http
             - VIRTUAL_PORT=80
             - CERT_NAME=test.local
+            - HOST_PROJECT_DIR=${PWD}
         user: root
         volumes:
             - .:/var/www/html
+            - /var/run/docker.sock:/var/run/docker.sock
         networks:
             - devnet
 networks:

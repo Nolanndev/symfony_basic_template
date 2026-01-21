@@ -4,12 +4,18 @@ monolog:
 
 when@dev:
     monolog:
+        channels: ['app_custom']
         handlers:
+            app_log:
+                type: stream
+                path: "%kernel.logs_dir%/app.log" # Chemin : var/log/app.log
+                level: debug
+                channels: ["app_custom"] # Ce handler n'écoute QUE le canal "app_custom"
             main:
                 type: stream
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
-                channels: ["!event"]
+                channels: ["!event","!app_custom"]
             console:
                 type: console
                 process_psr_3_messages: false

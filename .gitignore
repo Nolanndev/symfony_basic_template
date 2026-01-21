@@ -36,3 +36,5 @@ phpstan.neon
 .vscode
 
 /public/data/
+data/**/*.zip
+data/**/*.osm

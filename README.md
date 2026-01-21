@@ -79,3 +79,12 @@ Misc:
   -W [ --warn ]                    enable verbose warning messages
   -P                               additional parameter string (in cfg file format)
 ```
+
+
+## Loom
+
+```bash
+gtfs2graph -m all /data/gtfs_files/{$filebase}.zip > /data/temp/{$filebase}.raw.json
+topo -d 100 --infer-restr-max-dist 2 --write-stats --max-comp-dist 10 < /data/temp/{$filebase}.raw.json > /data/temp/{$filebase}.topo.z7-13.temp.json
+loom < /data/temp/{$filebase}.topo.z7-13.json > /data/temp/{$filebase}.loom.z7-13.json\"";
+```

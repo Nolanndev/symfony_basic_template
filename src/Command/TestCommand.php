@@ -85,6 +85,29 @@ class TestCommand extends Command
 
 
 
+        //
+        //   LOOM
+        //
+        $io->writeln(sprintf('Lancement du loom sur le gtfs %s', $gtfsId));
+        $loomStartTime = hrtime(true);
+        $process = new Process([
+            'docker', 'run', '-i', '--rm',
+            '--volume', sprintf('%s/data:/data', $hostProjectDir),
+            'loom',
+            '/bin/bash', '-c', 'gtfs2graph -m tram /data/gtfs/gtfs-aix.zip | topo | loom | octi | transitmap'
+        ]);
+        $process->run();
+        if (!$process->isSuccessful()) {
+            $io->error('Echec du pfaedle');
+            $this->logger->error('Echec du pfaedle - ' . $process->getErrorOutput());
+            return Command::FAILURE;
+        }
+        $loomEndTime = hrtime(true);
+        $loomTime = ($loomEndTime - $loomStartTime) / 1e+9;
+        $io->writeln(sprintf('Loom terminé en %.03f secondes', $loomTime));
+
+
+
         $processEndTime = hrtime(true);
         $processTime = ($processEndTime - $processStartTime) / 1e+9;
         $io->writeln(sprintf('Processus terminé en %.03f secondes', $processTime));
